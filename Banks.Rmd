@@ -1,0 +1,202 @@
+---
+title: "Prac1Exam1"
+author: "Sixto San Martin"
+date: "October 6, 2018"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(corrplot)
+library(factoextra)
+library(psych)
+library(NbClust)
+```
+
+#Import/load Data
+```{r}
+Banks = read.csv("C:/Users/sixto/OneDrive/Practicum1/Exam1/BankData.csv", stringsAsFactors = F)
+```
+
+#Cleaning/Checking
+```{r}
+# Remove NA's function
+delete.row.na <- function(DF, n=0) {
+  DF[1-(rowSums(is.na(DF))/ncol(DF)) >= n,]
+}
+delete.col.na <- function(DF, n=0) {
+  DF[,1-(colSums(is.na(DF))/nrow(DF)) >= n]
+}
+
+# Remove 75% columns and 50% rows
+dim(Banks)
+
+# 1310 74
+Banks1 <-delete.col.na(Banks,.75) 
+Banks2 <-delete.row.na(Banks1,.50) 
+dim(Banks1)
+
+# 1310 50 removed 24 columns
+dim(Banks2)
+
+# 1149 50 removed 161 rows
+nearZ <- nearZeroVar(Banks2)
+dim(nearZ)
+
+#Zeros to NA
+Banks2[Banks2 == 0] = NA
+
+```
+
+#Imputing/transformation
+```{r}
+# Median imputation, sorry had to impute, my dataset isn't huge
+Banks3 = apply(Banks2[,-1],2,function(x) {
+  if(is.numeric(x)) ifelse(is.na(x),median(x,na.rm=T),x) else x})
+Banks3 = as.data.frame(Banks3)
+```
+
+#PCA Breakouts
+```{r}
+# Break out bank performance measures for PCA, drivers, and descriptors
+
+# PCA Set 1 - Yield Performance Measures
+Yields = Banks3[,12:25]
+#summary(Yields)
+#outliers <- boxplot(Yields, plot=FALSE)$out
+#Yields[which(Yields %in% outliers),]
+#Yields <- Yields[-which(Yields %in% outliers),]
+
+# PCA Set 2 - Key Financial Bank Performance Ratios
+Ratios = Banks3[,26:37]
+
+# Drivers PCA Set 1 - Cost Measures
+Costs = Banks3[,38:43]
+
+# Drivers PCA Set 2 - On the Window Interest Rates
+Rates = Banks3[,1:11]
+
+# Additional PCA Set 1 - Changes in Assets and Liabilities
+Changes = Banks3[,44:47]
+
+# Response based on Median ROAA
+ROAA = as.numeric(Banks3$ROAA)
+ROAA = factor(
+  ifelse(ROAA < median(ROAA, na.rm = TRUE), 1, 
+   ifelse(ROAA > median(ROAA, na.rm = TRUE), 2, 3)
+   )
+)
+#ROAA = as.data.frame(ROAA)
+#Banks5 = cbind(Banks3$FinIns,Banks4)
+#Remove Negative values
+#Banks4$ROAA_Trans = log(Banks4$ROAA+100)
+```
+
+#Promax and Varimax rotations based on corrolated variables
+```{r}
+#corrplot(cor(Yields), order='hclust')
+YieldsPCA = prcomp(Yields, center=TRUE, scale=TRUE)
+summary(YieldsPCA)
+barplot(YieldsPCA$rotation[,1])
+barplot(YieldsPCA$rotation[,2])
+
+fviz_eig(YieldsPCA)
+
+fviz_pca_var(YieldsPCA,
+             col.var = "contrib", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+
+YieldsR = principal(Yields, center=TRUE, scale=TRUE, nfactors=1, rotate="promax")
+YieldsR
+
+#corrplot(cor(Ratios), order='hclust')
+
+RatiosPCA = prcomp(Ratios, center=TRUE, scale=TRUE)
+summary(RatiosPCA)
+barplot(RatiosPCA$rotation[,1])
+barplot(RatiosPCA$rotation[,2])
+
+fviz_eig(RatiosPCA)
+fviz_pca_var(RatiosPCA,
+             col.var = "contrib", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+
+RatiosR = principal(Ratios, nfactors=4, rotate="varimax")
+RatiosR
+
+corrplot(cor(Rates), order='hclust')
+
+RatesPCA = prcomp(Rates, center=TRUE, scale=TRUE)
+summary(RatesPCA)
+barplot(RatesPCA$rotation[,1])
+barplot(RatesPCA$rotation[,2])
+
+fviz_eig(RatesPCA)
+fviz_pca_var(RatesPCA,
+             col.var = "contrib", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+
+RatesR = principal(Rates, nfactors=3, rotate="promax")
+RatesR
+
+corrplot(cor(Costs), order='hclust')
+
+CostsPCA = prcomp(Costs, center=TRUE, scale=TRUE)
+summary(CostsPCA)
+barplot(CostsPCA$rotation[,1])
+barplot(CostsPCA$rotation[,2])
+
+fviz_eig(CostsPCA)
+fviz_pca_var(CostsPCA,
+             col.var = "contrib", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+
+CostsR = principal(Costs, nfactors=4, rotate="promax")
+CostsR
+
+ChangesPCA = prcomp(Changes, center=TRUE, scale=TRUE)
+summary(ChangesPCA)
+barplot(ChangesPCA$rotation[,1])
+barplot(ChangesPCA$rotation[,2])
+
+fviz_eig(ChangesPCA)
+fviz_pca_var(ChangesPCA,
+             col.var = "contrib", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+
+ChangesR = principal(Changes, nfactors=2, rotate="promax")
+ChangesR
+
+# Bring it all together for clustering
+Banks4 = cbind(YieldsR$scores,RatiosR$scores,RatesR$scores,CostsR$scores,ROAA)
+
+```
+
+#Clustering
+```{r}
+fviz_nbclust(Banks4, kmeans, method = "wss") +
+    geom_vline(xintercept = 5, linetype = 2)
+
+km.res = kmeans(Banks4, 5, nstart = 25)
+km.res
+
+fviz_cluster(km.res, data = Banks4,
+             ggtheme = theme_minimal()
+             )
+summary(Banks4)
+ccc = NbClust(Banks4, distance="euclidean", min.nc=5, max.nc=5, index="ccc", method="kmeans")
+ccc$All.index
+
+
+```
